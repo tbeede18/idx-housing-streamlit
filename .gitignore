@@ -1,0 +1,10 @@
+# Ignore Mac system files
+.DS_Store
+
+# Ignore large ML models and datasets
+models/*.pkl
+*.geojson
+*.csv
+
+# Ignore Python cache
+__pycache__/
