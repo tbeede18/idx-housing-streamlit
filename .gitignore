@@ -1,10 +1,26 @@
-# Ignore Mac system files
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
-# Ignore large ML models and datasets
-models/*.pkl
-*.geojson
-*.csv
-
-# Ignore Python cache
+# Python cache and environments
 __pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.env
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Streamlit Secrets (CRITICAL if you add Google Maps API keys later)
+.streamlit/secrets.toml
+
+# Large IDE folders (VS Code, PyCharm, etc.)
+.vscode/
+.idea/

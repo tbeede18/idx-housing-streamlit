@@ -8,7 +8,7 @@ import joblib
 from datetime import datetime
 from pathlib import Path
 import json
-from sklearn.neighbors import BallTree # <--- ADD THIS IMPORT
+from sklearn.neighbors import BallTree 
 
 import os
 import streamlit as st
@@ -77,14 +77,6 @@ def load_restaurant_tree():
         return None
 
 restaurant_tree = load_restaurant_tree()
-
-# Load the scaler and the list of columns to scale
-# try:
-#     scaler = joblib.load(DATA_DIR / 'scaler_X.pkl')
-#     scale_cols = joblib.load(DATA_DIR / 'scale_cols.pkl')
-# except FileNotFoundError:
-#     st.error("Scaler files missing. Please add scaler_X.pkl and scale_cols.pkl to the models/data/ folder.")
-#     scaler, scale_cols = None, None
 
 # Load the spatial data for the district lookup using geopandas
 districts_map = load_spatial_data()
@@ -291,7 +283,6 @@ if st.button("Calculate Value", type="primary"):
         
 
         # --- 🔍 THE INSPECTOR BLOCK ---
-        st.subheader("🕵️ Model Input Inspection")
         
         # 1. Show the Raw DataFrame (What the model sees after scaling)
         st.write("Scaled Inputs:")
