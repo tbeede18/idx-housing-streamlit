@@ -8,9 +8,39 @@ import joblib
 from datetime import datetime
 from pathlib import Path
 import json
+from sklearn.neighbors import BallTree # <--- ADD THIS IMPORT
+
+import os
+import streamlit as st
+from pathlib import Path
 
 # --- 0. PAGE CONFIG MUST BE FIRST ---
 st.set_page_config(page_title="CA House Price Predictor", layout="wide")
+
+# Setting up Pathing
+# base_path = Path(__file__).parent.absolute()
+PROJECT_ROOT = Path("/Users/23tylerb/Desktop/IDX_Exchange/idx-housing-streamlit")
+# print(PROJECT_ROOT)  # Debugging line to check the current directory
+DATA_DIR = PROJECT_ROOT / 'models' / 'data'
+
+# 1. Verify files exist before loading
+required_files = ['scaler_X.pkl', 'scale_cols.pkl', 'California_School_District_Areas_2024-25.geojson']
+
+for f in required_files:
+    file_path = DATA_DIR / f
+    if not file_path.exists():
+        st.error(f"🚨 MISSING FILE: {f} is NOT at {file_path}")
+    else:
+        st.write(f"✅ Found: {f}")
+
+# 3. Load them using the Ironclad Path
+try:
+    scaler = joblib.load(DATA_DIR / 'scaler_X.pkl')
+    scale_cols = joblib.load(DATA_DIR / 'scale_cols.pkl')
+    gdf_districts = gpd.read_file(DATA_DIR / 'California_School_District_Areas_2024-25.geojson')
+    st.success("🎯 All models and GeoData loaded successfully!")
+except Exception as e:
+    st.error(f"❌ Load Failed: {e}")
 
 # --- 1. INITIALIZE MEMORY (SESSION STATE) ---
 # This is how Streamlit remembers the auto-filled data between button clicks
@@ -18,11 +48,12 @@ if "auto_lat" not in st.session_state: st.session_state.auto_lat = None
 if "auto_lon" not in st.session_state: st.session_state.auto_lon = None
 if "auto_zip_price" not in st.session_state: st.session_state.auto_zip_price = None
 if "auto_dist_price" not in st.session_state: st.session_state.auto_dist_price = None
+if "auto_dist_rest" not in st.session_state: st.session_state.auto_dist_rest = None
 
 # --- 2. LOAD CACHED DATA ---
 @st.cache_data
 def load_spatial_data():
-    gdf_districts = gpd.read_file('models/data/California_School_District_Areas_2024-25.geojson')
+    gdf_districts = gpd.read_file(DATA_DIR / 'California_School_District_Areas_2024-25.geojson')
     high_schools_gdf = gdf_districts[gdf_districts['DistrictType'].isin(['High', 'Unified'])]
     return high_schools_gdf
 
@@ -31,8 +62,34 @@ def load_model(path):
     if not path.exists(): return None
     return joblib.load(path)
 
+@st.cache_resource
+def load_restaurant_tree():
+    try:
+        # 1. Load the parquet file
+        rest_df = pd.read_parquet(DATA_DIR / 'zengtao_restaurants.parquet')
+        # 2. Convert coordinates to radians
+        coords_rest = np.radians(rest_df[['lat', 'lon']].values)
+        # 3. Build and return the tree
+        tree = BallTree(coords_rest, metric="haversine")
+        return tree
+    except Exception as e:
+        st.error(f"Could not load restaurant data: {e}")
+        return None
+
+restaurant_tree = load_restaurant_tree()
+
+# Load the scaler and the list of columns to scale
+# try:
+#     scaler = joblib.load(DATA_DIR / 'scaler_X.pkl')
+#     scale_cols = joblib.load(DATA_DIR / 'scale_cols.pkl')
+# except FileNotFoundError:
+#     st.error("Scaler files missing. Please add scaler_X.pkl and scale_cols.pkl to the models/data/ folder.")
+#     scaler, scale_cols = None, None
+
+# Load the spatial data for the district lookup using geopandas
 districts_map = load_spatial_data()
-MODEL_PATH = Path("models/house_price_model.pkl")
+# Load the Model
+MODEL_PATH = PROJECT_ROOT / 'models' / 'house_price_model_v3.pkl'
 model = load_model(MODEL_PATH)
 
 # Load JSON dictionaries securely
@@ -76,14 +133,26 @@ if st.button("Search Address"):
             encoded_zip_price = zip_code_map.get(zip_code, zip_code_map.get('Unknown', 500000.0))
             encoded_district_price = district_map.get(found_district, district_map.get('Unknown', 500000.0))
             
+            # --- NEW: CALCULATE RESTAURANT DISTANCE ---
+            if restaurant_tree is not None:
+                # Convert this specific house's Lat/Lon to radians
+                house_rad = np.radians([[lat, lon]])
+                # Query the tree for the nearest 1 restaurant
+                dist_rad, _ = restaurant_tree.query(house_rad, k=1)
+                # Convert back to miles
+                dist_miles = dist_rad[0][0] * 3958.8
+            else:
+                dist_miles = None # Fallback if file is missing
+            
             # --- THE MAGIC TRICK ---
             # Update the memory state so the input boxes below auto-populate!
             st.session_state.auto_lat = float(lat)
             st.session_state.auto_lon = float(lon)
             st.session_state.auto_zip_price = float(encoded_zip_price)
             st.session_state.auto_dist_price = float(encoded_district_price)
+            st.session_state.auto_dist_rest = float(dist_miles)
 
-            st.success(f"Found! Detected ZIP: {zip_code} | District: {found_district}")
+            st.success(f"Found! Detected ZIP: {zip_code} | District: {found_district} | Nearest Restaurant: {dist_miles:.2f} mi")
         else:
             st.error("Could not find that address. Please check spelling.")
 
@@ -101,8 +170,9 @@ with col1:
     
     # Optional: Just show them the encoded prices as read-only text so they know it worked
     st.caption("Background Data:")
-    st.write(f"📍 Zip Value: ${st.session_state.auto_zip_price:,.0f}" if st.session_state.auto_zip_price else "📍 Zip Value: Waiting for address...")
-    st.write(f"🏫 District Value: ${st.session_state.auto_dist_price:,.0f}" if st.session_state.auto_dist_price else "🏫 District Value: Waiting for address...")
+    st.write(f"📍 Zip Value: ${st.session_state.auto_zip_price:,.2f}" if st.session_state.auto_zip_price else "📍 Zip Value: Waiting for address...")
+    st.write(f"🏫 District Value: ${st.session_state.auto_dist_price:,.2f}" if st.session_state.auto_dist_price else "🏫 District Value: Waiting for address...")
+    st.write(f"🍽️ Nearest Restaurant: {st.session_state.auto_dist_rest:.2f} mi" if st.session_state.auto_dist_rest is not None else "🍽️ Nearest Restaurant: Waiting for address...")
 
 with col2:
     st.header("🛏️ Rooms & Build")
@@ -112,8 +182,7 @@ with col2:
     year_built = st.number_input("Year Built", min_value=1800, max_value=2026, value=None, placeholder="e.g. 2005")
     
     # These are fine to keep defaults, or you can make them None too!
-    days_on_market = st.number_input("Days on Market", value=30)
-    dist_restaurant = st.number_input("Distance to Nearest Restaurant (mi)", value=0.5)
+    days_on_market = st.number_input("Days on Market", value=None, placeholder="e.g. 0")
 
 with col3:
     st.header("💰 Features")
@@ -176,14 +245,16 @@ def create_input_df():
         'NewConstructionYN': int(new_const),
         'GarageSpaces': garage_spaces,
         'LotSizeSquareFeet': lot_size,
+        'Home_Age': float(home_age),
+        # 'DistWestCoastMi': np.nan,  # ⚠️ TEMPORARY PLACEHOLDER - Replace with actual distance calculation if desired
         **flooring_cols, 
         'Monthly_HOA': hoa,
         'log_HOA': np.log1p(hoa),
-        'Home_Age^2': home_age**2,
+        # 'Home_Age^2': home_age**2,
         'Bed_to_Bath': beds / baths if (beds and baths and baths > 0) else 0,
         'Living_Area_to_Bedrooms': living_area / beds if (living_area and beds and beds > 0) else 0,
         'Living_Area_per_Story': living_area / stories if (living_area and stories) else 0,
-        'DistNearestRestaurantMi': dist_restaurant
+        'DistNearestRestaurantMi': st.session_state.auto_dist_rest
     }
     return pd.DataFrame([data])
 
@@ -193,12 +264,42 @@ if st.button("Calculate Value", type="primary"):
         st.error("🚨 Please search for a valid address first!")
     elif None in [living_area, beds, baths, year_built, lot_size]:
         st.warning("⚠️ Please fill out all the blank housing details before calculating.")
-    elif model:
-        input_df = create_input_df()
-        input_df = input_df[model.feature_names_in_]
+    # elif model:
+    #     input_df = create_input_df()
+    #     input_df = input_df[model.feature_names_in_]
         
-        pred = model.predict(input_df)[0]
+    #     pred = model.predict(input_df)[0]
+    #     st.balloons()
+    #     st.metric("Estimated Market Value", f"${pred:,.2f}")
+    elif model and scaler:
+        input_df = create_input_df()
+        
+        # 1. Ensure columns are in the exact order the model expects
+        input_df = input_df[model.feature_names_in_]
+
+        st.write("Unscaled Inputs:")
+        st.dataframe(input_df.iloc[:]) 
+        
+        # 2. SQUISH THE NUMBERS! (Apply the scaler only to the necessary columns)
+        input_df[scale_cols] = scaler.transform(input_df[scale_cols].astype('float32'))
+        
+        # 3. Predict the Log Value
+        raw_pred = model.predict(input_df)[0]
+        
+        # 4. Convert Log back to Real Dollars
+        pred_in_dollars = np.expm1(raw_pred) 
+        
+
+        # --- 🔍 THE INSPECTOR BLOCK ---
+        st.subheader("🕵️ Model Input Inspection")
+        
+        # 1. Show the Raw DataFrame (What the model sees after scaling)
+        st.write("Scaled Inputs:")
+        st.dataframe(input_df.iloc[:]) 
+        
+        # ------------------------------
+        
         st.balloons()
-        st.metric("Estimated Market Value", f"${pred:,.2f}")
+        st.metric("Estimated Market Value", f"${pred_in_dollars:,.2f}")
     else:
-        st.error("Model not loaded. Check the 'models' folder.")
+        st.error("Model or Scaler not loaded. Check the 'models/data' folder.")
