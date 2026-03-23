@@ -19,9 +19,10 @@ st.set_page_config(page_title="CA House Price Predictor", layout="wide")
 
 # Setting up Pathing
 # base_path = Path(__file__).parent.absolute()
-PROJECT_ROOT = Path("/Users/23tylerb/Desktop/IDX_Exchange/idx-housing-streamlit")
+# PROJECT_ROOT = Path("/Users/23tylerb/Desktop/IDX_Exchange/idx-housing-streamlit")
 # print(PROJECT_ROOT)  # Debugging line to check the current directory
-DATA_DIR = PROJECT_ROOT / 'models' / 'data'
+PROJECT_ROOT = Path(__file__).parent.absolute()
+DATA_DIR = Path('models/data')
 
 # 1. Verify files exist before loading
 required_files = ['scaler_X.pkl', 'scale_cols.pkl', 'California_School_District_Areas_2024-25.geojson']
