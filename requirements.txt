@@ -8,3 +8,4 @@ geopandas
 geopy
 shapely
 pyarrow
+requests
