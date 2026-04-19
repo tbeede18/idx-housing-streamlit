@@ -91,7 +91,7 @@ restaurant_tree = load_restaurant_tree()
 # Load the spatial data for the district lookup using geopandas
 districts_map = load_spatial_data()
 # Load the Model
-MODEL_PATH = PROJECT_ROOT / 'models' / 'house_price_model_v3.pkl'
+MODEL_PATH = PROJECT_ROOT / 'models' / 'house_price_model_final.pkl'
 model = load_model(MODEL_PATH)
 
 # Load JSON dictionaries securely
