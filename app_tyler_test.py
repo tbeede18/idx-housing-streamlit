@@ -310,8 +310,8 @@ if st.button("Calculate Value", type="primary"):
         # 1. Ensure columns are in the exact order the model expects
         input_df = input_df[model.feature_names_in_]
 
-        # st.write("Unscaled Inputs:")
-        # st.dataframe(input_df.iloc[:]) 
+        st.write("Unscaled Inputs:")
+        st.dataframe(input_df.iloc[:]) 
         
         # 2. SQUISH THE NUMBERS! (Apply the scaler only to the necessary columns)
         input_df[scale_cols] = scaler.transform(input_df[scale_cols].astype('float32'))
@@ -320,14 +320,14 @@ if st.button("Calculate Value", type="primary"):
         raw_pred = model.predict(input_df)[0]
         
         # 4. Convert Log back to Real Dollars
-        pred_in_dollars = np.expm1(raw_pred) 
+        # pred_in_dollars = np.expm1(raw_pred) 
         
 
         # --- 🔍 THE INSPECTOR BLOCK ---
         
         # 1. Show the Raw DataFrame (What the model sees after scaling)
-        # st.write("Scaled Inputs:")
-        # st.dataframe(input_df.iloc[:]) 
+        st.write("Scaled Inputs:")
+        st.dataframe(input_df.iloc[:]) 
         
         # ------------------------------
         
