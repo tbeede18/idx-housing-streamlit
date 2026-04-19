@@ -27,21 +27,29 @@ DATA_DIR = Path('models/data')
 # 1. Verify files exist before loading
 required_files = ['scaler_X.pkl', 'scale_cols.pkl', 'California_School_District_Areas_2024-25.geojson']
 
+# Not needed in production, but helpful for debugging during development. You can comment this out later.
+# for f in required_files:
+#     file_path = DATA_DIR / f
+#     if not file_path.exists():
+#         st.error(f"🚨 MISSING FILE: {f} is NOT at {file_path}")
+#     else:
+#         st.write(f"✅ Found: {f}")
+# 3. Load them using the Ironclad Path
+# try:
+#     scaler = joblib.load(DATA_DIR / 'scaler_X.pkl')
+#     scale_cols = joblib.load(DATA_DIR / 'scale_cols.pkl')
+#     gdf_districts = gpd.read_file(DATA_DIR / 'California_School_District_Areas_2024-25.geojson')
+#     st.success("🎯 All models and GeoData loaded successfully!")
+# except Exception as e:
+#     st.error(f"❌ Load Failed: {e}")
+
+# Production ready code without checks.
 for f in required_files:
     file_path = DATA_DIR / f
-    if not file_path.exists():
-        st.error(f"🚨 MISSING FILE: {f} is NOT at {file_path}")
-    else:
-        st.write(f"✅ Found: {f}")
+scaler = joblib.load(DATA_DIR / 'scaler_X.pkl')
+scale_cols = joblib.load(DATA_DIR / 'scale_cols.pkl')
+gdf_districts = gpd.read_file(DATA_DIR / 'California_School_District_Areas_2024-25.geojson')
 
-# 3. Load them using the Ironclad Path
-try:
-    scaler = joblib.load(DATA_DIR / 'scaler_X.pkl')
-    scale_cols = joblib.load(DATA_DIR / 'scale_cols.pkl')
-    gdf_districts = gpd.read_file(DATA_DIR / 'California_School_District_Areas_2024-25.geojson')
-    st.success("🎯 All models and GeoData loaded successfully!")
-except Exception as e:
-    st.error(f"❌ Load Failed: {e}")
 
 # --- 1. INITIALIZE MEMORY (SESSION STATE) ---
 # This is how Streamlit remembers the auto-filled data between button clicks
