@@ -3,7 +3,8 @@ import pandas as pd
 import numpy as np
 import geopandas as gpd
 from shapely.geometry import Point
-from geopy.geocoders import Nominatim
+import requests
+from typing import Optional
 import joblib
 from datetime import datetime
 from pathlib import Path
@@ -104,23 +105,56 @@ except FileNotFoundError:
     zip_code_map = {"Unknown": 0.0}
     district_map = {"Unknown": 0.0}
 
+
+def _get_google_maps_api_key() -> Optional[str]:
+    try:
+        key = st.secrets.get("GOOGLE_MAPS_API_KEY")
+        if key:
+            return str(key).strip()
+    except Exception:
+        pass
+    key = os.getenv("GOOGLE_MAPS_API_KEY", "").strip()
+    return key or None
+
+
+def _geocode_google(address: str, api_key: str) -> tuple[float, float, str]:
+    url = "https://maps.googleapis.com/maps/api/geocode/json"
+    resp = requests.get(url, params={"address": address, "key": api_key}, timeout=30)
+    resp.raise_for_status()
+    data = resp.json()
+    status = data.get("status")
+    if status != "OK":
+        raise ValueError(f"Google geocoding failed: {status} {data.get('error_message', '')}".strip())
+    result = data["results"][0]
+    loc = result["geometry"]["location"]
+    lat = float(loc["lat"])
+    lon = float(loc["lng"])
+    zip_code = "Unknown"
+    for comp in result.get("address_components", []):
+        if "postal_code" in comp.get("types", []):
+            z = comp.get("long_name")
+            if z:
+                zip_code = str(z).strip()
+            break
+    return lat, lon, zip_code
+
+
 # --- 3. AUTO-FILL ADDRESS SEARCH ---
 st.title("🏡 CA House Price Predictor")
 
 address_input = st.text_input("Enter Property Address", placeholder="e.g. 3551 Trousdale Pkwy, Los Angeles, CA 90089")
 
-if st.button("Search Address"):
+google_key = _get_google_maps_api_key()
+if google_key is None:
+    st.warning("🔑 Add `GOOGLE_MAPS_API_KEY` to Streamlit secrets (or env var) to enable address search.")
+
+if st.button("Search Address", disabled=google_key is None):
     with st.spinner("Locating property and calculating district data..."):
-        geolocator = Nominatim(user_agent="usc_housing_ta_app")
-        location = geolocator.geocode(address_input, addressdetails=True)
-        
-        if location:
-            lat, lon = location.latitude, location.longitude
-            
-            # Extract ZIP
-            raw_address = location.raw.get('address', {})
-            zip_code = raw_address.get('postcode', 'Unknown')
-            
+        try:
+            lat, lon, zip_code = _geocode_google(address_input, google_key)
+        except Exception as e:
+            st.error(f"Could not geocode address: {e}")
+        else:
             # Spatial Join for District
             point = Point(lon, lat)
             point_gdf = gpd.GeoDataFrame(geometry=[point], crs="EPSG:4326").to_crs(districts_map.crs)
@@ -154,8 +188,6 @@ if st.button("Search Address"):
             st.session_state.auto_dist_rest = float(dist_miles)
 
             st.success(f"Found! Detected ZIP: {zip_code} | District: {found_district} | Nearest Restaurant: {dist_miles:.2f} mi")
-        else:
-            st.error("Could not find that address. Please check spelling.")
 
 st.divider()
 # --- 4. MANUAL INPUT SECTION ---
