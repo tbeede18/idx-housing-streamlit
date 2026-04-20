@@ -313,8 +313,8 @@ if st.button("Calculate Value", type="primary"):
         # st.write("Unscaled Inputs:")
         # st.dataframe(input_df.iloc[:]) 
         
-        # 2. SQUISH THE NUMBERS! (Apply the scaler only to the necessary columns)
-        input_df[scale_cols] = scaler.transform(input_df[scale_cols].astype('float32'))
+        # # 2. SQUISH THE NUMBERS! (Apply the scaler only to the necessary columns)
+        # input_df[scale_cols] = scaler.transform(input_df[scale_cols].astype('float32'))
         
         # st.write("Scaled Inputs:")
         # st.dataframe(input_df.iloc[:]) 
